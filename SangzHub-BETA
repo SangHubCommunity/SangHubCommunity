@@ -1,112 +1,406 @@
-repeat task.wait() until game:IsLoaded()
-if game.CoreGui:FindFirstChild("SangHubUI") then game.CoreGui.SangHubUI:Destroy() end
+-- 🛡️ Anti-AFK
+for i, v in pairs(getconnections(game.Players.LocalPlayer.Idled)) do
+    v:Disable()
+end
 
--- Load UI Library từ GitHub
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/BloxFruitsNew/main/src.lua"))()
-local ui = Library:CreateWindow("Sang Hub")
-
--- Tabs
-local farmTab = ui:CreateTab("Auto Farm")
-local espTab = ui:CreateTab("ESP")
-local miscTab = ui:CreateTab("Misc")
-
--- Variables
+-- ⚙️ Variables
 local plr = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 local vim = game:GetService("VirtualInputManager")
-local rep = game:GetService("ReplicatedStorage")
-local autoHaki = false
-local autoCollect = false
-local espPlayer = false
-local espFruit = false
+local RunService = game:GetService("RunService")
 
--- Toggle GUI Button
-local toggleGui = Instance.new("TextButton")
-toggleGui.Size = UDim2.new(0, 60, 0, 30)
-toggleGui.Position = UDim2.new(0, 10, 0.85, 0)
-toggleGui.Text = "GUI"
-toggleGui.Parent = game.CoreGui
-toggleGui.BackgroundColor3 = Color3.fromRGB(30,30,30)
-toggleGui.TextColor3 = Color3.new(1,1,1)
-toggleGui.Font = Enum.Font.GothamBold
-toggleGui.TextSize = 14
-toggleGui.Name = "SangHubToggle"
-Instance.new("UICorner", toggleGui).CornerRadius = UDim.new(0, 8)
+getgenv().AutoFarm = false
+getgenv().UseMelee = true
 
-toggleGui.MouseButton1Click:Connect(function()
-    ui:Toggle()
+-- 🖼️ GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "SangHub"
+gui.ResetOnSpawn = false
+
+-- 🔘 Toggle GUI Button
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 80, 0, 35)
+toggleBtn.Position = UDim2.new(0, 10, 0, 0.05)
+toggleBtn.Text = "📂"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+
+-- 📦 Main Frame
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 320, 0, 580)
+frame.Position = UDim2.new(0.05, 0, 0.15, 0)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.Visible = true
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- 🔠 Tab Title
+local tabTitle = Instance.new("TextLabel", frame)
+tabTitle.Size = UDim2.new(1, 0, 0, 35)
+tabTitle.Position = UDim2.new(0, 0, 0, 0)
+tabTitle.BackgroundTransparency = 1
+tabTitle.Text = "🌾 Main - Auto Farm"
+tabTitle.Font = Enum.Font.GothamBold
+tabTitle.TextColor3 = Color3.fromRGB(0, 255, 0)
+tabTitle.TextSize = 18
+
+-- 🔘 Create Button Template
+local function createButton(text, posY, callback)
+	local btn = Instance.new("TextButton", frame)
+	btn.Size = UDim2.new(0, 280, 0, 35)
+	btn.Position = UDim2.new(0, 20, 0, posY)
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	btn.MouseButton1Click:Connect(callback)
+	return btn
+end
+
+-- ⚔️ Select Weapon Button
+local weaponBtn = createButton("Weapon: Melee 🥋", 50, function()
+	getgenv().UseMelee = not getgenv().UseMelee
+	weaponBtn.Text = getgenv().UseMelee and "Weapon: Melee 🥋" or "Weapon: Sword ⚔️"
 end)
 
--- Auto Haki
-miscTab:CreateToggle("Auto Haki", false, function(state)
-    autoHaki = state
+-- 🧠 Auto Farm Toggle
+local autoFarmBtn = createButton("Auto Farm: OFF", 100, function()
+	getgenv().AutoFarm = not getgenv().AutoFarm
+	autoFarmBtn.Text = getgenv().AutoFarm and "Auto Farm: ON" or "Auto Farm: OFF"
 end)
 
+-- 📥 Toggle GUI visibility
+toggleBtn.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)
+-- 🧠 Get Current Mob
+local function GetMob()
+	for i, v in pairs(game.Workspace.Enemies:GetChildren()) do
+		if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+			return v
+		end
+	end
+	return nil
+end
+
+-- 💨 Tween tới đảo
+local function TweenTo(pos)
+	local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	local tweenInfo = TweenInfo.new((hrp.Position - pos).Magnitude / 200, Enum.EasingStyle.Linear)
+	local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(pos)})
+	tween:Play()
+	tween.Completed:Wait()
+end
+
+-- 🧱 Tạo block ảo dưới chân
+local function createPlatform()
+	if not workspace:FindFirstChild("SangHub_Block") then
+		local part = Instance.new("Part", workspace)
+		part.Name = "SangHub_Block"
+		part.Anchored = true
+		part.Size = Vector3.new(10, 1, 10)
+		part.Position = plr.Character.HumanoidRootPart.Position - Vector3.new(0, 3.5, 0)
+		part.Transparency = 1
+	end
+end
+
+-- 🔁 Auto Farm Loop
 task.spawn(function()
-	while task.wait(4) do
-		if autoHaki then
-			pcall(function()
-				rep.Remotes.CommE:FireServer("Buso")
-			end)
+	while task.wait(0.3) do
+		if getgenv().AutoFarm and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			local mob = GetMob()
+			if mob then
+				createPlatform()
+				local mobPos = mob.HumanoidRootPart.Position
+				TweenTo(mobPos + Vector3.new(0, mob.Humanoid.HipHeight + 6, 0))
+
+				-- Equip vũ khí
+				local tool = nil
+				for _, item in pairs(plr.Backpack:GetChildren()) do
+					if item:IsA("Tool") then
+						if getgenv().UseMelee and item:FindFirstChild("RemoteFunction") then
+							tool = item
+						elseif not getgenv().UseMelee and item:FindFirstChild("Handle") then
+							tool = item
+						end
+					end
+				end
+				if tool then
+					plr.Character.Humanoid:EquipTool(tool)
+				end
+
+				-- Tăng hitbox
+				pcall(function()
+					mob.HumanoidRootPart.Size = Vector3.new(60, 60, 60)
+					mob.HumanoidRootPart.Transparency = 1
+					mob.HumanoidRootPart.CanCollide = false
+				end)
+
+				-- Click tấn công
+				vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+				task.wait()
+				vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+			end
 		end
 	end
 end)
+-- 🌐 Tab ESP (thêm vào GUI chính)
+local tabESP = Instance.new("TextLabel", frame)
+tabESP.Size = UDim2.new(1, 0, 0, 35)
+tabESP.Position = UDim2.new(0, 0, 0, 150)
+tabESP.BackgroundTransparency = 1
+tabESP.Text = "🧠 ESP Tab"
+tabESP.Font = Enum.Font.GothamBold
+tabESP.TextColor3 = Color3.fromRGB(0, 255, 0)
+tabESP.TextSize = 18
 
--- ESP Player
-espTab:CreateToggle("ESP Người Chơi", false, function(state)
-    espPlayer = state
+-- ESP toggles
+local espPlayer = createButton("ESP Player: OFF", 190, function()
+	getgenv().ESP_Player = not getgenv().ESP_Player
+	espPlayer.Text = getgenv().ESP_Player and "ESP Player: ON" or "ESP Player: OFF"
 end)
 
--- ESP Trái & Auto Collect
-espTab:CreateToggle("ESP Trái Ác Quỷ", false, function(state)
-    espFruit = state
+local espFruit = createButton("ESP Fruit: OFF", 235, function()
+	getgenv().ESP_Fruit = not getgenv().ESP_Fruit
+	espFruit.Text = getgenv().ESP_Fruit and "ESP Fruit: ON" or "ESP Fruit: OFF"
 end)
 
-miscTab:CreateToggle("Auto Collect Trái", false, function(state)
-    autoCollect = state
+local espIsland = createButton("ESP Island: OFF", 280, function()
+	getgenv().ESP_Island = not getgenv().ESP_Island
+	espIsland.Text = getgenv().ESP_Island and "ESP Island: ON" or "ESP Island: OFF"
 end)
 
-local function CreateESP(part, name, color, tagName)
-    local tag = Instance.new("BillboardGui", part)
-    tag.Name = tagName
-    tag.Size = UDim2.new(0, 100, 0, 40)
-    tag.StudsOffset = Vector3.new(0, 2, 0)
-    tag.AlwaysOnTop = true
+-- ESP loop
+task.spawn(function()
+	while task.wait(1) do
+		if getgenv().ESP_Player then
+			for _, v in pairs(game.Players:GetPlayers()) do
+				if v.Character and v ~= plr and not v.Character:FindFirstChild("SangHub_ESP") then
+					local esp = Instance.new("BillboardGui", v.Character:WaitForChild("Head"))
+					esp.Name = "SangHub_ESP"
+					esp.Size = UDim2.new(0, 100, 0, 20)
+					esp.AlwaysOnTop = true
+					local text = Instance.new("TextLabel", esp)
+					text.Size = UDim2.new(1, 0, 1, 0)
+					text.BackgroundTransparency = 1
+					text.Text = "👤 " .. v.Name
+					text.TextColor3 = Color3.fromRGB(0, 255, 0)
+					text.TextSize = 10
+					text.Font = Enum.Font.Gotham
+				end
+			end
+		end
+		if getgenv().ESP_Fruit then
+			for _, v in pairs(game.Workspace:GetChildren()) do
+				if string.find(v.Name:lower(), "fruit") and not v:FindFirstChild("SangHub_ESP") then
+					local esp = Instance.new("BillboardGui", v)
+					esp.Name = "SangHub_ESP"
+					esp.Size = UDim2.new(0, 100, 0, 20)
+					esp.AlwaysOnTop = true
+					local text = Instance.new("TextLabel", esp)
+					text.Size = UDim2.new(1, 0, 1, 0)
+					text.BackgroundTransparency = 1
+					text.Text = "🍇 " .. v.Name
+					text.TextColor3 = Color3.fromRGB(255, 0, 0)
+					text.TextSize = 10
+					text.Font = Enum.Font.Gotham
+				end
+			end
+		end
+	end
+end)
+-- Tab tiêu đề
+local fruitTitle = Instance.new("TextLabel", frame)
+fruitTitle.Size = UDim2.new(1, 0, 0, 35)
+fruitTitle.Position = UDim2.new(0, 0, 0, 330)
+fruitTitle.BackgroundTransparency = 1
+fruitTitle.Text = "🍉 Fruit Tab"
+fruitTitle.Font = Enum.Font.GothamBold
+fruitTitle.TextColor3 = Color3.fromRGB(0, 255, 0)
+fruitTitle.TextSize = 18
 
-    local txt = Instance.new("TextLabel", tag)
-    txt.Size = UDim2.new(1, 0, 1, 0)
-    txt.Text = name
-    txt.TextColor3 = color
-    txt.TextSize = 10
-    txt.BackgroundTransparency = 1
+-- Các button chức năng
+local randomBtn = createButton("🎲 Random Fruit (Remote)", 370, function()
+	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Cousin")
+end)
+
+local stockBtn = createButton("📦 Fruit Stock", 415, function()
+	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("GetFruits")
+end)
+
+local mirageBtn = createButton("🌀 Mirage Stock", 460, function()
+	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("GetFruits", "Mirage Island")
+end)
+
+local autoStoreBtn = createButton("Auto Store: OFF", 505, function()
+	getgenv().AutoStore = not getgenv().AutoStore
+	autoStoreBtn.Text = getgenv().AutoStore and "Auto Store: ON" or "Auto Store: OFF"
+end)
+
+-- Auto Store Loop
+task.spawn(function()
+	while task.wait(2) do
+		if getgenv().AutoStore then
+			for _, item in pairs(plr.Backpack:GetChildren()) do
+				if string.find(item.Name:lower(), "fruit") then
+					game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StoreFruit", item.Name)
+				end
+			end
+		end
+	end
+end)
+local Islands = {
+	"Starter Island", "Jungle", "Pirate Village", "Desert", "Snow Island", "Marine Fortress",
+	"Sky Island", "Prison", "Colosseum", "Magma Village", "Underwater City", "Fountain City"
+}
+
+local tpTitle = Instance.new("TextLabel", frame)
+tpTitle.Size = UDim2.new(1, 0, 0, 35)
+tpTitle.Position = UDim2.new(0, 0, 0, 550)
+tpTitle.BackgroundTransparency = 1
+tpTitle.Text = "🗺️ Teleport Island"
+tpTitle.Font = Enum.Font.GothamBold
+tpTitle.TextColor3 = Color3.fromRGB(0, 255, 0)
+tpTitle.TextSize = 18
+
+local selectedIsland = Islands[1]
+local tpBtn = createButton("Island: " .. selectedIsland, 590, function()
+	local index = table.find(Islands, selectedIsland)
+	index = index + 1
+	if index > #Islands then index = 1 end
+	selectedIsland = Islands[index]
+	tpBtn.Text = "Island: " .. selectedIsland
+end)
+
+local goBtn = createButton("🚀 Tween to Island", 635, function()
+	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("requestEntrance", Vector3.new(0,0,0)) -- bảo hiểm cổng dịch
+	local coords = workspace._WorldOrigin.Locations:FindFirstChild(selectedIsland)
+	if coords then
+		TweenTo(coords.Position)
+	end
+end)
+-- Cơ chế nhận nhiệm vụ + đánh quái theo Wish Final
+function GetQuestInfo()
+	for i, v in pairs(game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("GetQuestData")) do
+		if tostring(v.Name):find(getgenv().CurrentQuest) then
+			return v
+		end
+	end
+end
+
+function TweenTo(pos)
+	local char = game.Players.LocalPlayer.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		local ts = game:GetService("TweenService")
+		local info = TweenInfo.new((char.HumanoidRootPart.Position - pos).Magnitude / 300, Enum.EasingStyle.Linear)
+		local tween = ts:Create(char.HumanoidRootPart, info, {CFrame = CFrame.new(pos)})
+		tween:Play()
+		tween.Completed:Wait()
+	end
+end
+
+function AutoEquip()
+	local toolName = getgenv().UseMelee and "Combat" or getgenv().CurrentWeapon or "Katana"
+	for _, v in pairs(plr.Backpack:GetChildren()) do
+		if v:IsA("Tool") and v.Name == toolName then
+			v.Parent = plr.Character
+		end
+	end
 end
 
 task.spawn(function()
-	while task.wait(1) do
-		-- Player ESP
-		for _, pl in pairs(game.Players:GetPlayers()) do
-			if pl ~= plr and pl.Character and pl.Character:FindFirstChild("Head") then
-				local head = pl.Character.Head
-				if espPlayer and not head:FindFirstChild("ESP") then
-					CreateESP(head, pl.Name, Color3.fromRGB(0,255,0), "ESP")
-				elseif not espPlayer and head:FindFirstChild("ESP") then
-					head:FindFirstChild("ESP"):Destroy()
-				end
+	while task.wait(0.5) do
+		if getgenv().AutoFarm then
+			local questData = GetQuestInfo()
+			if not questData or questData.CurrentEnemies < questData.TotalEnemies then
+				-- Nếu chưa có nhiệm vụ thì nhận
+				game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", getgenv().CurrentQuest, 1)
 			end
-		end
 
-		-- Fruit ESP + Auto Collect
-		for _,v in pairs(workspace:GetChildren()) do
-			if v:IsA("Tool") and v:FindFirstChild("Handle") and v.Handle:FindFirstChild("TouchInterest") then
-				if espFruit and not v:FindFirstChild("FruitESP") then
-					CreateESP(v.Handle, v.Name, Color3.fromRGB(255,0,0), "FruitESP")
-				elseif not espFruit and v:FindFirstChild("FruitESP") then
-					v.FruitESP:Destroy()
-				end
-				if autoCollect and (v.Handle.Position - plr.Character.HumanoidRootPart.Position).Magnitude < 50 then
-					firetouchinterest(plr.Character.HumanoidRootPart, v.Handle, 0)
-					firetouchinterest(plr.Character.HumanoidRootPart, v.Handle, 1)
+			local enemies = workspace.Enemies:GetChildren()
+			for _, mob in pairs(enemies) do
+				if mob.Name == getgenv().CurrentQuest and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+					AutoEquip()
+					TweenTo(mob.HumanoidRootPart.Position + Vector3.new(0, 15, 0))
+					task.wait(0.2)
+					vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+					task.wait()
+					vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 				end
 			end
 		end
 	end
 end)
+-- Hitbox to + đứng trên đầu + chặn rớt biển
+function ExpandHitbox(mob)
+	for _, part in pairs(mob:GetChildren()) do
+		if part:IsA("BasePart") then
+			part.Size = Vector3.new(60, 60, 60)
+			part.Transparency = 0.8
+			part.CanCollide = false
+		end
+	end
+end
+
+-- Tạo block ảo dưới chân
+function AddFakePlatform()
+	local root = plr.Character:FindFirstChild("HumanoidRootPart")
+	if root and not workspace:FindFirstChild("FakeBlock") then
+		local part = Instance.new("Part", workspace)
+		part.Name = "FakeBlock"
+		part.Anchored = true
+		part.Size = Vector3.new(20, 1, 20)
+		part.Position = root.Position - Vector3.new(0, 3.5, 0)
+		part.CanCollide = true
+		part.Transparency = 0.3
+	end
+end
+
+task.spawn(function()
+	while task.wait(0.3) do
+		if getgenv().AutoFarm then
+			AddFakePlatform()
+			for _, mob in pairs(workspace.Enemies:GetChildren()) do
+				if mob.Name == getgenv().CurrentQuest and mob:FindFirstChild("HumanoidRootPart") then
+					ExpandHitbox(mob)
+				end
+			end
+		else
+			if workspace:FindFirstChild("FakeBlock") then
+				workspace.FakeBlock:Destroy()
+			end
+		end
+	end
+end)
+-- Fix toggle chữ
+autoFarmBtn.MouseButton1Click:Connect(function()
+	getgenv().AutoFarm = not getgenv().AutoFarm
+	autoFarmBtn.Text = getgenv().AutoFarm and "Auto Farm: ON" or "Auto Farm: OFF"
+end)
+
+weaponBtn.MouseButton1Click:Connect(function()
+	getgenv().UseMelee = not getgenv().UseMelee
+	weaponBtn.Text = getgenv().UseMelee and "Weapon: Melee 🥋" or "Weapon: Sword ⚔️"
+end)
+
+-- Auto Click thật
+task.spawn(function()
+	while task.wait(0.15) do
+		if getgenv().AutoFarm then
+			vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+			task.wait()
+			vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+		end
+	end
+end)
+
+-- GUI chỉnh size
+frame.Size = UDim2.new(0.3, 0, 1, 0) -- full chiều dọc
+frame.ClipsDescendants = true -- để có thể scroll nếu thừa
