@@ -1,0 +1,112 @@
+repeat task.wait() until game:IsLoaded()
+if game.CoreGui:FindFirstChild("SangHubUI") then game.CoreGui.SangHubUI:Destroy() end
+
+-- Load UI Library từ GitHub
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/BloxFruitsNew/main/src.lua"))()
+local ui = Library:CreateWindow("Sang Hub")
+
+-- Tabs
+local farmTab = ui:CreateTab("Auto Farm")
+local espTab = ui:CreateTab("ESP")
+local miscTab = ui:CreateTab("Misc")
+
+-- Variables
+local plr = game.Players.LocalPlayer
+local vim = game:GetService("VirtualInputManager")
+local rep = game:GetService("ReplicatedStorage")
+local autoHaki = false
+local autoCollect = false
+local espPlayer = false
+local espFruit = false
+
+-- Toggle GUI Button
+local toggleGui = Instance.new("TextButton")
+toggleGui.Size = UDim2.new(0, 60, 0, 30)
+toggleGui.Position = UDim2.new(0, 10, 0.85, 0)
+toggleGui.Text = "GUI"
+toggleGui.Parent = game.CoreGui
+toggleGui.BackgroundColor3 = Color3.fromRGB(30,30,30)
+toggleGui.TextColor3 = Color3.new(1,1,1)
+toggleGui.Font = Enum.Font.GothamBold
+toggleGui.TextSize = 14
+toggleGui.Name = "SangHubToggle"
+Instance.new("UICorner", toggleGui).CornerRadius = UDim.new(0, 8)
+
+toggleGui.MouseButton1Click:Connect(function()
+    ui:Toggle()
+end)
+
+-- Auto Haki
+miscTab:CreateToggle("Auto Haki", false, function(state)
+    autoHaki = state
+end)
+
+task.spawn(function()
+	while task.wait(4) do
+		if autoHaki then
+			pcall(function()
+				rep.Remotes.CommE:FireServer("Buso")
+			end)
+		end
+	end
+end)
+
+-- ESP Player
+espTab:CreateToggle("ESP Người Chơi", false, function(state)
+    espPlayer = state
+end)
+
+-- ESP Trái & Auto Collect
+espTab:CreateToggle("ESP Trái Ác Quỷ", false, function(state)
+    espFruit = state
+end)
+
+miscTab:CreateToggle("Auto Collect Trái", false, function(state)
+    autoCollect = state
+end)
+
+local function CreateESP(part, name, color, tagName)
+    local tag = Instance.new("BillboardGui", part)
+    tag.Name = tagName
+    tag.Size = UDim2.new(0, 100, 0, 40)
+    tag.StudsOffset = Vector3.new(0, 2, 0)
+    tag.AlwaysOnTop = true
+
+    local txt = Instance.new("TextLabel", tag)
+    txt.Size = UDim2.new(1, 0, 1, 0)
+    txt.Text = name
+    txt.TextColor3 = color
+    txt.TextSize = 10
+    txt.BackgroundTransparency = 1
+end
+
+task.spawn(function()
+	while task.wait(1) do
+		-- Player ESP
+		for _, pl in pairs(game.Players:GetPlayers()) do
+			if pl ~= plr and pl.Character and pl.Character:FindFirstChild("Head") then
+				local head = pl.Character.Head
+				if espPlayer and not head:FindFirstChild("ESP") then
+					CreateESP(head, pl.Name, Color3.fromRGB(0,255,0), "ESP")
+				elseif not espPlayer and head:FindFirstChild("ESP") then
+					head:FindFirstChild("ESP"):Destroy()
+				end
+			end
+		end
+
+		-- Fruit ESP + Auto Collect
+		for _,v in pairs(workspace:GetChildren()) do
+			if v:IsA("Tool") and v:FindFirstChild("Handle") and v.Handle:FindFirstChild("TouchInterest") then
+				if espFruit and not v:FindFirstChild("FruitESP") then
+					CreateESP(v.Handle, v.Name, Color3.fromRGB(255,0,0), "FruitESP")
+				elseif not espFruit and v:FindFirstChild("FruitESP") then
+					v.FruitESP:Destroy()
+				end
+				if autoCollect and (v.Handle.Position - plr.Character.HumanoidRootPart.Position).Magnitude < 50 then
+					firetouchinterest(plr.Character.HumanoidRootPart, v.Handle, 0)
+					firetouchinterest(plr.Character.HumanoidRootPart, v.Handle, 1)
+				end
+			end
+		end
+	end
+end)
